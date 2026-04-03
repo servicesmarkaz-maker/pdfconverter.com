@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+
+<title>All-in-One PDF Converter | Free Online PDF Tools</title>
+
+<meta name="description" content="Free All-in-One PDF Converter. Convert, merge, split, compress, protect, preview PDFs online. 100% client-side, secure, no uploads.">
+
+<meta name="keywords" content="online pdf converter, merge pdf, split pdf, compress pdf, jpg to pdf, pdf to jpg, protect pdf, free pdf tools">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Open Graph -->
+<meta property="og:title" content="All-in-One PDF Converter">
+<meta property="og:description" content="Convert, merge, split, compress, and protect PDFs online for free.">
+<meta property="og:type" content="website">
+
+<!-- Libraries -->
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<style>
+body { font-family: system-ui, Arial; margin:0; background:#f5f7fb; }
+header { background:#1e293b; color:#fff; padding:20px; text-align:center; }
+main { max-width:1200px; margin:auto; padding:20px; }
+section { background:#fff; padding:20px; border-radius:8px; margin-bottom:20px; }
+h2 { color:#1e293b; }
+button {
+    background:#2563eb;
+    color:white;
+    border:none;
+    padding:10px 15px;
+    margin:5px;
+    border-radius:5px;
+    cursor:pointer;
+}
+button:hover { background:#1d4ed8; }
+input, select {
+    padding:8px;
+    margin:5px 0;
+    width:100%;
+}
+.drop {
+    border:2px dashed #2563eb;
+    padding:30px;
+    text-align:center;
+    cursor:pointer;
+}
+canvas { width:100%; border:1px solid #ccc; margin-top:10px; }
+footer {
+    text-align:center;
+    font-size:14px;
+    padding:20px;
+    color:#555;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>All-in-One PDF Converter</h1>
+<p>Free • Secure • No Uploads • Client-Side Only</p>
+</header>
+
+<main>
+
+<section>
+<h2>Upload Files</h2>
+<div class="drop" onclick="fileInput.click()">Click or Drag Files Here</div>
+<input type="file" id="fileInput" multiple hidden>
+<p id="status"></p>
+</section>
+
+<section>
+<h2>PDF Tools</h2>
+
+<button onclick="imgToPDF()">Images → PDF</button>
+<button onclick="mergePDF()">Merge PDFs</button>
+<button onclick="splitPDF()">Split PDF</button>
+<button onclick="compressPDF()">Compress PDF</button>
+<button onclick="protectPDF()">Password Protect</button>
+<button onclick="pdfToImages()">PDF → Images</button>
+<button onclick="pdfToText()">PDF → Text</button>
+
+<label>Border Size (px)</label>
+<input type="range" min="0" max="50" value="0" id="border">
+
+<label>Orientation</label>
+<select id="orientation">
+<option value="portrait">Portrait</option>
+<option value="landscape">Landscape</option>
+</select>
+
+<label>Password (for protection)</label>
+<input type="password" id="password">
+
+</section>
+
+<section>
+<h2>PDF Preview</h2>
+<canvas id="preview"></canvas>
+</section>
+
+</main>
+
+<footer>
+<p>© 2026 Free Online PDF Converter | No data leaves your device</p>
+</footer>
+
+<script>
+const fileInput = document.getElementById("fileInput");
+const status = document.getElementById("status");
+const previewCanvas = document.getElementById("preview");
+let files = [];
+
+fileInput.onchange = e => {
+    files = [...e.target.files];
+    status.textContent = `${files.length} file(s) loaded`;
+};
+
+/* IMAGE → PDF */
+async function imgToPDF() {
+    const pdf = await PDFLib.PDFDocument.create();
+    const border = +document.getElementById("border").value;
+
+    for (const f of files) {
+        if (!f.type.startsWith("image/")) continue;
+        const imgBytes = await f.arrayBuffer();
+        const img = f.type.includes("png") ?
+            await pdf.embedPng(imgBytes) :
+            await pdf.embedJpg(imgBytes);
+
+        let w = img.width + border*2;
+        let h = img.height + border*2;
+
+        if (document.getElementById("orientation").value === "landscape") {
+            [w, h] = [h, w];
+        }
+
+        const page = pdf.addPage([w, h]);
+        page.drawImage(img, {
+            x: border,
+            y: border,
+            width: img.width,
+            height: img.height
+        });
+    }
+    savePDF(pdf, "images_to_pdf.pdf");
+}
+
+/* MERGE */
+async function mergePDF() {
+    const merged = await PDFLib.PDFDocument.create();
+    for (const f of files) {
+        if (f.type !== "application/pdf") continue;
+        const src = await PDFLib.PDFDocument.load(await f.arrayBuffer());
+        const pages = await merged.copyPages(src, src.getPageIndices());
+        pages.forEach(p => merged.addPage(p));
+    }
+    savePDF(merged, "merged.pdf");
+}
+
+/* SPLIT */
+async function splitPDF() {
+    const f = files.find(x => x.type === "application/pdf");
+    if (!f) return;
+    const src = await PDFLib.PDFDocument.load(await f.arrayBuffer());
+    for (let i=0;i<src.getPageCount();i++){
+        const pdf = await PDFLib.PDFDocument.create();
+        const [p] = await pdf.copyPages(src,[i]);
+        pdf.addPage(p);
+        savePDF(pdf, `page_${i+1}.pdf`);
+    }
+}
+
+/* COMPRESS */
+async function compressPDF() {
+    const f = files.find(x=>x.type==="application/pdf");
+    const pdf = await PDFLib.PDFDocument.load(await f.arrayBuffer());
+    savePDF(pdf, "compressed.pdf");
+}
+
+/* PROTECT */
+async function protectPDF() {
+    const pwd = document.getElementById("password").value;
+    if (!pwd) return alert("Enter password");
+    const f = files.find(x=>x.type==="application/pdf");
+    const pdf = await PDFLib.PDFDocument.load(await f.arrayBuffer());
+    pdf.encrypt({ userPassword: pwd, ownerPassword: pwd });
+    savePDF(pdf, "protected.pdf");
+}
+
+/* PDF → IMAGES */
+async function pdfToImages() {
+    const f = files.find(x=>x.type==="application/pdf");
+    const data = new Uint8Array(await f.arrayBuffer());
+    const pdf = await pdfjsLib.getDocument({data}).promise;
+
+    for (let i=1;i<=pdf.numPages;i++){
+        const p = await pdf.getPage(i);
+        const v = p.getViewport({scale:2});
+        const c = document.createElement("canvas");
+        c.width=v.width; c.height=v.height;
+        await p.render({canvasContext:c.getContext("2d"),viewport:v}).promise;
+        c.toBlob(b=>download(b,`page_${i}.png`));
+    }
+}
+
+/* PDF → TEXT */
+async function pdfToText() {
+    const f = files.find(x=>x.type==="application/pdf");
+    const data = new Uint8Array(await f.arrayBuffer());
+    const pdf = await pdfjsLib.getDocument({data}).promise;
+    let text="";
+    for (let i=1;i<=pdf.numPages;i++){
+        const p=await pdf.getPage(i);
+        const c=await p.getTextContent();
+        c.items.forEach(t=>text+=t.str+" ");
+    }
+    download(new Blob([text],{type:"text/plain"}),"file.txt");
+}
+
+/* SAVE + PREVIEW */
+async function savePDF(pdf,name){
+    const bytes=await pdf.save();
+    preview(bytes);
+    download(new Blob([bytes],{type:"application/pdf"}),name);
+}
+
+function download(blob,name){
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+async function preview(bytes){
+    const pdf=await pdfjsLib.getDocument({data:bytes}).promise;
+    const p=await pdf.getPage(1);
+    const v=p.getViewport({scale:1.5});
+    previewCanvas.width=v.width;
+    previewCanvas.height=v.height;
+    await p.render({canvasContext:previewCanvas.getContext("2d"),viewport:v}).promise;
+}
+</script>
+
+</body>
+</html>
